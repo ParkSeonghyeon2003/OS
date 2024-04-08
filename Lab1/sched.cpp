@@ -110,8 +110,8 @@ class RR : public Scheduler{
                 current_job_ = job_queue_.front();
                 job_queue_.pop();
             }
-            if (left_slice_ == 0) {
-				while (!waiting_queue.empty()) {
+            if (left_slice_ == 0 || current_job_.remain_time == 0) {
+				while (!job_queue_.empty()) {
 					Job front = job_queue_.front();
 					if (front.arrival_time <= current_time_) {
 					    waiting_queue.push(front);
@@ -124,12 +124,19 @@ class RR : public Scheduler{
                     // 작업 완료 벡터에 저장
                     end_jobs_.push_back(current_job_);
                     if (waiting_queue.empty() && job_queue_.empty()) return -1;
-                    current_job_ = waiting_queue.front();
-                    waiting_queue.pop();
                 } else {
-                	waiting_queue.push(current_job_);
-                	
+                	// 대기 큐가 비어있지 않으면 현재 작업 대기 큐에 push
+                	if (!waiting_queue.empty()) waiting_queue.push(current_job_);
                 }
+                // 아래 조건 false면 문맥 교환이 필요 X
+                if (!waiting_queue.empty()) {
+                	current_job_ = waiting_queue.front();
+                	waiting_queue.pop();
+                	current_time_ += switch_time_;
+                }
+            	
+            	// left slice을 time slice 값으로 초기화
+            	left_slice_ = time_slice_;
             }
             // 현재 작업이 처음 스케줄링 되는 것이라면
             if (current_job_.service_time == current_job_.remain_time) {
