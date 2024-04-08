@@ -1,8 +1,8 @@
 /*
-*   DKU Operating System Lab
-*       Lab1 (Scheduler Algorithm Simulator)
-*       Student id : 32221741 
-*       Student name : Park Seonghyeon 
+*    DKU Operating System Lab
+*    Lab1 (Scheduler Algorithm Simulator)
+*    Student id : 32221741 
+*    Student name : Park Seonghyeon 
 */
 
 #include <string>
@@ -111,13 +111,13 @@ class RR : public Scheduler{
                 job_queue_.pop();
             }
             if (left_slice_ == 0 || current_job_.remain_time == 0) {
-				while (!job_queue_.empty()) {
-					Job front = job_queue_.front();
-					if (front.arrival_time <= current_time_) {
-					    waiting_queue.push(front);
-					    job_queue_.pop();
-					} else break;
-				}
+                while (!job_queue_.empty()) {
+                    Job front = job_queue_.front();
+                    if (front.arrival_time <= current_time_) {
+                        waiting_queue.push(front);
+                        job_queue_.pop();
+                    } else break;
+                }
                 if (current_job_.remain_time == 0) {
                     // 작업 완료 시간 기록
                     current_job_.completion_time = current_time_;
@@ -125,18 +125,18 @@ class RR : public Scheduler{
                     end_jobs_.push_back(current_job_);
                     if (waiting_queue.empty() && job_queue_.empty()) return -1;
                 } else {
-                	// 대기 큐가 비어있지 않으면 현재 작업 대기 큐에 push
-                	if (!waiting_queue.empty()) waiting_queue.push(current_job_);
+                    // 대기 큐가 비어있지 않으면 현재 작업 대기 큐에 push
+                    if (!waiting_queue.empty()) waiting_queue.push(current_job_);
                 }
                 // 아래 조건 false면 문맥 교환이 필요 X
                 if (!waiting_queue.empty()) {
-                	current_job_ = waiting_queue.front();
-                	waiting_queue.pop();
-                	current_time_ += switch_time_;
+                    current_job_ = waiting_queue.front();
+                    waiting_queue.pop();
+                    current_time_ += switch_time_;
                 }
-            	
-            	// left slice을 time slice 값으로 초기화
-            	left_slice_ = time_slice_;
+                
+                // left slice을 time slice 값으로 초기화
+                left_slice_ = time_slice_;
             }
             // 현재 작업이 처음 스케줄링 되는 것이라면
             if (current_job_.service_time == current_job_.remain_time) {
@@ -188,7 +188,6 @@ class SRT : public Scheduler{
                     job_queue_.pop();
                 } else break;
             }
-            sort(v.begin(), v.end(), compare);
             // 현재 작업이 모두 완료되면
             if (current_job_.remain_time == 0) {
                 // 작업 완료 시간 기록
@@ -197,6 +196,7 @@ class SRT : public Scheduler{
                 end_jobs_.push_back(current_job_);
                 // 남은 작업이 없으면 종료
                 if (job_queue_.empty() && v.empty()) return -1;
+                sort(v.begin(), v.end(), compare);
                 // 대기열에 작업 존재 시 그 작업 수행
                 if (!v.empty()) {
                     current_job_ = v.back();
@@ -291,19 +291,19 @@ class HRRN : public Scheduler{
 // FeedBack 스케줄러 (queue 개수 : 4 / boosting 없음)
 class FeedBack : public Scheduler{
     private:
-        std::queue<std::queue<Job>> feedback_queue;
-        std::queue<Job> q0;
-        std::queue<Job> q1;
-        std::queue<Job> q2;
-        std::queue<Job> q3;
+        Job queues[4];
+        int time_slice_, left_slice_;
     public:
         FeedBack(std::queue<Job> jobs, double switch_overhead, bool is_2i) : Scheduler(jobs, switch_overhead) {
             if(is_2i){
                 name = "FeedBack_2i";
+                time_slice_ = 2;
+                left_slice_ = 2;
             } else {
                 name = "FeedBack_1";
+                time_slice_ = 1;
+                left_slice_ = 1;
             }
-
             /*
             * 위 생성자 선언 및 이름 초기화 코드 수정하지 말것.
             * 나머지는 자유롭게 수정 및 작성 가능
@@ -313,14 +313,20 @@ class FeedBack : public Scheduler{
         int run() override {
             // 할당된 작업이 없고, job_queue가 비어있지 않으면 작업 할당
             if (current_job_.name == 0 && !job_queue_.empty()) {
-                feedback_queue.push(q0);
-                feedback_queue.push(q1);
-                feedback_queue.push(q2);
-                feedback_queue.push(q3);
                 current_job_ = job_queue_.front();
                 job_queue_.pop();
             }
-            if ((int)current_time_)
+            if (left_slice_ == 0) {
+                while(!job_queue_.empty()) {
+                    Job front = job_queue_.front();
+                    if (front.arrival_time <= current_time_) {
+                        queues[0].push(front);
+                        job_queue_.pop();
+                    } else break;
+                }
+                left_slice_ = time_slice_;
+            }
+            
             // 현재 작업이 처음 스케줄링 되는 것이라면
             if (current_job_.service_time == current_job_.remain_time) {
                 // 첫 실행 시간 기록
