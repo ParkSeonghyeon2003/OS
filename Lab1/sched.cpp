@@ -5,6 +5,7 @@
 *    Student name : Park Seonghyeon 
 */
 
+#include <cmath>
 #include <string>
 #include <stdio.h>
 #include <iostream>
@@ -79,7 +80,6 @@ class SPN : public Scheduler{
             current_time_++;
             // 작업의 남은 시간 --
             current_job_.remain_time--;
-
             // 스케줄링할 작업명 반환
             return current_job_.name;
         }
@@ -110,23 +110,24 @@ class RR : public Scheduler{
                 current_job_ = job_queue_.front();
                 job_queue_.pop();
             }
+            while (!job_queue_.empty()) {
+                Job front = job_queue_.front();
+                if (front.arrival_time <= current_time_) {
+                    waiting_queue.push(front);
+                    job_queue_.pop();
+                } else break;
+            }
             if (left_slice_ == 0 || current_job_.remain_time == 0) {
-                while (!job_queue_.empty()) {
-                    Job front = job_queue_.front();
-                    if (front.arrival_time <= current_time_) {
-                        waiting_queue.push(front);
-                        job_queue_.pop();
-                    } else break;
-                }
+                
                 if (current_job_.remain_time == 0) {
                     // 작업 완료 시간 기록
                     current_job_.completion_time = current_time_;
                     // 작업 완료 벡터에 저장
                     end_jobs_.push_back(current_job_);
                     if (waiting_queue.empty() && job_queue_.empty()) return -1;
-                } else {
+                } else if (!waiting_queue.empty()) {
                     // 대기 큐가 비어있지 않으면 현재 작업 대기 큐에 push
-                    if (!waiting_queue.empty()) waiting_queue.push(current_job_);
+                    waiting_queue.push(current_job_);
                 }
                 // 아래 조건 false면 문맥 교환이 필요 X
                 if (!waiting_queue.empty()) {
@@ -150,7 +151,6 @@ class RR : public Scheduler{
             current_job_.remain_time--;
             
             left_slice_--;
-
             // 스케줄링할 작업명 반환
             return current_job_.name;
         }
@@ -291,19 +291,31 @@ class HRRN : public Scheduler{
 // FeedBack 스케줄러 (queue 개수 : 4 / boosting 없음)
 class FeedBack : public Scheduler{
     private:
-        Job queues[4];
-        int time_slice_, left_slice_;
+        struct job_with_lt {
+            Job job;
+            int left_slice;
+        };
+        std::queue<job_with_lt> queues[4];
+        bool is_2i_;
+        int time_slice_;
+        int left_slice_;
+        int curLevel;
+        bool isEmpty() {
+            for (int i = 0; i < 4; i++) {
+                if (!queues[i].empty()) {
+                    return false;
+                }
+            }
+            return true;
+        }
     public:
         FeedBack(std::queue<Job> jobs, double switch_overhead, bool is_2i) : Scheduler(jobs, switch_overhead) {
             if(is_2i){
                 name = "FeedBack_2i";
-                time_slice_ = 2;
-                left_slice_ = 2;
             } else {
                 name = "FeedBack_1";
-                time_slice_ = 1;
-                left_slice_ = 1;
             }
+            is_2i_ = is_2i;
             /*
             * 위 생성자 선언 및 이름 초기화 코드 수정하지 말것.
             * 나머지는 자유롭게 수정 및 작성 가능
@@ -314,17 +326,52 @@ class FeedBack : public Scheduler{
             // 할당된 작업이 없고, job_queue가 비어있지 않으면 작업 할당
             if (current_job_.name == 0 && !job_queue_.empty()) {
                 current_job_ = job_queue_.front();
+                time_slice_ = 1;
+                left_slice_ = time_slice_;
+                curLevel = 0;
                 job_queue_.pop();
             }
-            if (left_slice_ == 0) {
-                while(!job_queue_.empty()) {
-                    Job front = job_queue_.front();
-                    if (front.arrival_time <= current_time_) {
-                        queues[0].push(front);
-                        job_queue_.pop();
-                    } else break;
+            // 상위 큐부터 채우기
+            while(!job_queue_.empty()) {
+                Job front = job_queue_.front();
+                if (front.arrival_time <= current_time_) {
+                    job_with_lt temp;
+                    temp.job = front;
+                    temp.left_slice = 1;
+                    queues[0].push(temp);
+                    job_queue_.pop();
+                } else break;
+            }
+            // 현재 작업 완료 혹은 time_slice_가 0이면 문맥 교환
+            if (current_job_.remain_time == 0 || left_slice_ <= 0) {
+                job_with_lt cur;
+                cur.job = current_job_;
+                cur.left_slice = is_2i_ ? time_slice_*2 : time_slice_;
+                if (current_job_.remain_time == 0) {
+                    // 작업 완료 시간 기록
+                    current_job_.completion_time = current_time_;
+                    // 작업 완료 벡터에 저장
+                    end_jobs_.push_back(current_job_);
+                    
+                    if (isEmpty() && job_queue_.empty()) return -1;
+                } else if (!isEmpty()) {
+                    if (curLevel < 3) queues[curLevel+1].push(cur);
+                    else queues[curLevel].push(cur);
                 }
-                left_slice_ = time_slice_;
+                if (!isEmpty()) {
+                    for (int i = 0; i < 4; i++) {
+                        if (!queues[i].empty()) {
+                            job_with_lt front = queues[i].front();
+                            current_job_ = front.job;
+                            time_slice_ = front.left_slice;
+                            left_slice_ = time_slice_;
+                            curLevel = i;
+                            queues[i].pop();
+                            if (current_job_.name != cur.job.name) current_time_ += switch_time_;
+                            break;
+                        }
+                    }
+                }
             }
             
             // 현재 작업이 처음 스케줄링 되는 것이라면
@@ -334,7 +381,7 @@ class FeedBack : public Scheduler{
             }
             current_time_++;
             current_job_.remain_time--;
-            //return current_job_.name;
-            return -1;
+            left_slice_--;
+            return current_job_.name;
         }
 };
