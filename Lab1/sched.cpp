@@ -204,7 +204,7 @@ class SRT : public Scheduler{
                     current_time_ += switch_time_;
                 }
             // 작업이 끝나지 않았지만 도착한 작업 중 remain time이 더 짧은게 있다면
-            } else if (!v.empty() && v.front().remain_time < current_job_.remain_time) {
+            } else if (!v.empty() && v.back().remain_time < current_job_.remain_time) {
                 Job temp = current_job_;
                 current_job_ = v.back();
                 v.pop_back();
